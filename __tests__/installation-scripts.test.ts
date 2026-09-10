@@ -21,13 +21,16 @@ describe('Dotnet installation scripts tests', () => {
       const response: hc.HttpClientResponse = await httpCallbackClient.get(
         'https://dot.net/v1/dotnet-install.sh'
       );
+
       expect(response.message.statusCode).toBe(200);
+
       const upToDateContents: string = await response.readBody();
       const currentContents: string = fs
         .readFileSync(
           path.join(__dirname, '..', 'externals', 'install-dotnet.sh')
         )
         .toString();
+
       expect(normalizeFileContents(currentContents)).toBe(
         normalizeFileContents(upToDateContents)
       );
@@ -36,7 +39,7 @@ describe('Dotnet installation scripts tests', () => {
   );
 
   it(
-    'Uses an up to date powershell download script',
+    'Keeps the pristine PowerShell download script up to date',
     async () => {
       const httpCallbackClient = new hc.HttpClient(
         'setup-dotnet-test',
@@ -46,19 +49,56 @@ describe('Dotnet installation scripts tests', () => {
       const response: hc.HttpClientResponse = await httpCallbackClient.get(
         'https://dot.net/v1/dotnet-install.ps1'
       );
+
       expect(response.message.statusCode).toBe(200);
+
       const upToDateContents: string = await response.readBody();
       const currentContents: string = fs
         .readFileSync(
-          path.join(__dirname, '..', 'externals', 'install-dotnet.ps1')
+          path.join(
+            __dirname,
+            '..',
+            'externals',
+            'upstream',
+            'install-dotnet.ps1'
+          )
         )
         .toString();
+
       expect(normalizeFileContents(currentContents)).toBe(
         normalizeFileContents(upToDateContents)
       );
     },
     TEST_TIMEOUT
   );
+
+  it('applies native Windows download and extraction optimizations', () => {
+    const generatedContents: string = fs
+      .readFileSync(
+        path.join(__dirname, '..', 'externals', 'install-dotnet.ps1')
+      )
+      .toString();
+
+    expect(generatedContents).toContain(
+      '$env:DOTNET_INSTALL_SKIP_NATIVE_TOOLS -eq "1"'
+    );
+
+    expect(generatedContents).toContain(
+      'Get-Command -Name $Name -CommandType Application -ErrorAction SilentlyContinue'
+    );
+
+    expect(generatedContents).toContain(
+      'Try-DownloadFile-WithCurl -Source $Source -OutPath $OutPath'
+    );
+
+    expect(generatedContents).toContain(
+      'DownloadFile-UsingHttpClient -Source $Source -OutPath $OutPath'
+    );
+
+    expect(generatedContents).toContain(
+      'Try-Extract-Dotnet-Package-With7Zip -ZipPath $ZipPath -OutPath $OutPath'
+    );
+  });
 });
 
 function normalizeFileContents(contents: string): string {
